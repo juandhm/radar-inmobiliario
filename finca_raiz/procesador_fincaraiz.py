@@ -102,12 +102,12 @@ class ProcesadorFincaRaiz:
         # Inicializar con valores por defecto
         inmueble_estandarizado = {
             'id_inmueble': '',
-            'id_plataforma': self.nombre_plataforma,
+            'plataforma': self.nombre_plataforma,
             'url_anuncio': '',
             'pais': '',
             'departamento': '',
             'ciudad': '',
-            'barrios': '',
+            'barrio1': '',
             'direccion': '',
             'latitud': '',
             'longitud': '',
@@ -124,6 +124,7 @@ class ProcesadorFincaRaiz:
             'estrato': '',
             'estado': '',
             'antiguedad_construccion': '',
+            'remodelado': False,
             'precio_venta': '',
             'precio_administracion': '',
             'fecha_publicacion': '',
@@ -158,10 +159,10 @@ class ProcesadorFincaRaiz:
                 
                 # Barrio
                 if 'neighbourhood' in locations and isinstance(locations['neighbourhood'], list) and len(locations['neighbourhood']) > 0:
-                    barrios = ""
-                    for neighbourhood in locations['neighbourhood']:
-                        barrios = barrios + neighbourhood.get('name', '') + ", "
-                    inmueble_estandarizado['barrios'] = barrios
+                    for i, neighbourhood in enumerate(locations['neighbourhood']):
+                        # estandarizar el nombre del barrio pasando a minusculas y eliminando acentos
+                        barrio = neighbourhood.get('name', '').lower().replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+                        inmueble_estandarizado[f'barrio{i+1}'] = barrio
             
             # Coordenadas
             inmueble_estandarizado['latitud'] = inmueble.get('latitude', '')
@@ -221,6 +222,27 @@ class ProcesadorFincaRaiz:
             owner_data = inmueble.get('owner', {})
             if isinstance(owner_data, dict):
                 inmueble_estandarizado['nombre_contacto'] = owner_data.get('name', '')
+
+            # Detección de remodelado por texto (título/descripción/amenidades)
+            try:
+                textos: List[str] = []
+                for clave in ('title', 'description'):
+                    valor = inmueble.get(clave)
+                    if isinstance(valor, str):
+                        textos.append(valor)
+
+                texto = ' '.join(textos).lower()
+                for a, b in (('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u')):
+                    texto = texto.replace(a, b)
+
+                palabras = [
+                    'remodelado', 'remodelada', 'remodelacion', 'renovado', 'renovada',
+                    'reformado', 'reformada', 'actualizado', 'actualizada', 'modernizado', 'modernizada',
+                    'cocina remodelada', 'banos remodelados', 'baño remodelado', 'bano remodelado'
+                ]
+                inmueble_estandarizado['remodelado'] = any(p in texto for p in palabras)
+            except Exception:
+                inmueble_estandarizado['remodelado'] = False
         
         return inmueble_estandarizado
     
@@ -265,11 +287,11 @@ class ProcesadorFincaRaiz:
             
             # Definir orden de columnas según especificación
             columnas_ordenadas = [
-                'id_inmueble', 'id_plataforma', 'url_anuncio',
-                'pais', 'departamento', 'ciudad', 'barrios', 'direccion',
+                'id_inmueble', 'plataforma', 'url_anuncio',
+                'pais', 'departamento', 'ciudad', 'barrio1', 'direccion',
                 'latitud', 'longitud',
                 'tipo_propiedad', 'area_total_m2', 'num_habitaciones', 'num_banos', 'num_parqueaderos',
-                'estrato', 'estado', 'antiguedad_construccion',
+                'estrato', 'estado', 'antiguedad_construccion', 'remodelado',
                 'precio_venta', 'precio_administracion',
                 'fecha_publicacion', 'fecha_actualizacion', 'fecha_ingreso',
                 'nombre_contacto'
@@ -328,7 +350,6 @@ class ProcesadorFincaRaiz:
             
             # 3. Procesar inmuebles
             inmuebles_procesados = self.procesar_inmuebles(lista_inmuebles)
-            print(len(inmuebles_procesados))
             
             # 4. Generar archivos
             json_procesado = self.generar_json_procesado(inmuebles_procesados)

@@ -63,12 +63,12 @@ class ProcesadorMetrocuadrado:
         """Mapear campos del inmueble a la estructura estandarizada usada en el proyecto."""
         inmueble_estandarizado = {
             'id_inmueble': '',
-            'id_plataforma': self.nombre_plataforma,
+            'plataforma': self.nombre_plataforma,
             'url_anuncio': '',
             'pais': '',
             'departamento': '',
             'ciudad': '',
-            'barrios': '',
+            'barrio1': '',
             'direccion': '',
             'latitud': '',
             'longitud': '',
@@ -80,6 +80,7 @@ class ProcesadorMetrocuadrado:
             'estrato': '',
             'estado': '',
             'antiguedad_construccion': '',
+            'remodelado': False,
             'precio_venta': '',
             'precio_administracion': '',
             'fecha_publicacion': '',
@@ -109,7 +110,7 @@ class ProcesadorMetrocuadrado:
         if isinstance(city, dict):
             inmueble_estandarizado['ciudad'] = city.get('name', '')
         if isinstance(neighborhood, dict):
-            inmueble_estandarizado['barrios'] = neighborhood.get('name', '')
+            inmueble_estandarizado['barrio1'] = neighborhood.get('name', '')
 
         # Coordenadas
         location = inmueble.get('location', {})
@@ -149,6 +150,27 @@ class ProcesadorMetrocuadrado:
             inmueble_estandarizado['nombre_contacto'] = advertiser.get('name', '')
         elif isinstance(seller, dict) and seller.get('name'):
             inmueble_estandarizado['nombre_contacto'] = seller.get('name', '')
+
+        # Detección de remodelado por título/descripción/listas
+        try:
+            textos: List[str] = []
+            for clave in ('comments'): 
+                valor = inmueble.get(clave)
+                if isinstance(valor, str):
+                    textos.append(valor)
+
+            texto = ' '.join(textos).lower()
+            for a, b in (('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u')):
+                texto = texto.replace(a, b)
+
+            palabras = [
+                'remodelado', 'remodelada', 'remodelacion', 'renovado', 'renovada',
+                'reformado', 'reformada', 'actualizado', 'actualizada', 'modernizado', 'modernizada',
+                'cocina remodelada', 'banos remodelados', 'baño remodelado', 'bano remodelado'
+            ]
+            inmueble_estandarizado['remodelado'] = any(p in texto for p in palabras)
+        except Exception:
+            inmueble_estandarizado['remodelado'] = False
 
         return inmueble_estandarizado
 
@@ -193,11 +215,11 @@ class ProcesadorMetrocuadrado:
 
             # Definir orden de columnas según especificación (alineado con Finca Raíz actualizado)
             columnas_ordenadas = [
-                'id_inmueble', 'id_plataforma', 'url_anuncio',
-                'pais', 'departamento', 'ciudad', 'barrios', 'direccion',
+                'id_inmueble', 'plataforma', 'url_anuncio',
+                'pais', 'departamento', 'ciudad', 'barrio1', 'direccion',
                 'latitud', 'longitud',
                 'tipo_propiedad', 'area_total_m2', 'num_habitaciones', 'num_banos', 'num_parqueaderos',
-                'estrato', 'estado', 'antiguedad_construccion',
+                'estrato', 'estado', 'antiguedad_construccion', 'remodelado',
                 'precio_venta', 'precio_administracion',
                 'fecha_publicacion', 'fecha_actualizacion', 'fecha_ingreso',
                 'nombre_contacto'
